@@ -190,7 +190,7 @@ void mainMenu(void *argument)
     {
       vTaskSuspend(appTaskHandle);
 
-      menuinit();
+      //menuinit();
 
 
     }
