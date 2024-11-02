@@ -27,15 +27,7 @@
 #define MAX7219_REG_SHUTDOWN	0x0C
 #define MAX7219_REG_TEST		0x0F
 
-static uint8_t block[8]={0xc0,
-                             0xc0,
-                             0x00,
-                             0x00,
-                             0x00,
-                             0x00,
-                             0x00,
-                             0x00
-                             };
+
 
 void Light_WriteByte(uint8_t Data);
 void Light_WriteBytes(uint8_t* pButter,uint16_t byteCount);
@@ -46,7 +38,7 @@ void Light_Decode(uint8_t status);
 void Light_Intensity(uint8_t val);
 void Light_ScanLimit(uint8_t val);
 
-void LightsendLEDGraphics(uint8_t *led1,uint8_t *led2,uint8_t *led3,uint8_t *led4,uint8_t *led5);
+void LightsendLEDGraphics(uint8_t (*leddata)[8]);
 void lightSendToMax7219(uint8_t address, uint8_t *data, uint8_t num_devices);
 
 void Light_Tx(uint8_t reg,uint8_t val);

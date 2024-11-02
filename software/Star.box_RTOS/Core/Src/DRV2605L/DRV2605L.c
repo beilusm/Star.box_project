@@ -88,7 +88,7 @@ void DRV2605L_Init(void)
     DRV2605L_SetLOOP_GAIN(0x02);
 
 
-    DRV2605L_Writebyte(DRV2605_REG_RATEDV,100);//设置额定电压 81
+    DRV2605L_Writebyte(DRV2605_REG_RATEDV,255);//设置额定电压 81
     DRV2605L_Writebyte(DRV2605_REG_CLAMPV,255);//设置峰值电压
     DRV2605L_SetAUTO_CAL_TIME(0x02);
     DRV2605L_SetDrive_TIME(10);  //31

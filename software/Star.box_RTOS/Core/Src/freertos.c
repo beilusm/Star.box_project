@@ -46,6 +46,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define PointFront 0
+#define PointBack 1
+#define PointRight 2
+#define PointLeft 3
 
 
 /* USER CODE END PD */
@@ -58,12 +62,83 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 
-uint8_t led1[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
-uint8_t led2[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
-uint8_t led3[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
-uint8_t led4[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
-uint8_t led5[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
 
+uint8_t fullled[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+
+uint8_t Pback[8]={
+  0x00,
+  0x00,
+  0x18,
+  0x3c,
+  0x7e,
+  0x7e,
+  0x00,
+  0x00
+};
+uint8_t Pfront[8] = {
+  0x00,
+  0x00,
+  0x7e,
+  0x7e,
+  0x3c,
+  0x18,
+  0x00,
+  0x00
+};
+uint8_t Pleft[8] = {
+  0x10,
+  0x30,
+  0x70,
+  0xf0,
+  0xf0,
+  0x70,
+  0x30,
+  0x10
+};
+uint8_t Pright[8] = {
+  0x08,
+  0x0c,
+  0x0e,
+  0x0f,
+  0x0f,
+  0x0e,
+  0x0c,
+  0x08
+};
+
+
+
+uint8_t beginLed[5][8];
+uint8_t (*ledBlock)[8];
+
+typedef struct MenuItem {
+  uint8_t block[8];
+
+  struct MenuItem *front;
+  struct MenuItem *back;
+  struct MenuItem *left;
+  struct MenuItem *right;
+
+  struct MenuItem *last;
+
+  void (*action)(void);
+}MenuItem;
+
+typedef struct pointer
+{
+  uint8_t block[8];
+  uint8_t point;
+}pointer;
+
+
+
+MenuItem *nowMenu;
+pointer *Pointer;
+MenuItem *root;
+MenuItem *setting;
+MenuItem *display;
+MenuItem *game;
+MenuItem *nullMenu;
 
 
 uint32_t menuTimeout;
@@ -106,7 +181,9 @@ const osThreadAttr_t appTask_attributes = {
 /* USER CODE BEGIN FunctionPrototypes */
 
 
+void menuInit();
 
+void rootAction();
 
 /* USER CODE END FunctionPrototypes */
 
@@ -177,11 +254,13 @@ void mainMenu(void *argument)
 {
   /* USER CODE BEGIN mainMenu */
   
+  menuInit();
+
   vTaskSuspend(NULL);
   /* Infinite loop */
   for(;;)
   {
-    if(HAL_GetTick()-menuTimeout>10000)
+    if(HAL_GetTick()-menuTimeout>8000)
     {
       vTaskResume(appTaskHandle);
       vTaskSuspend(NULL);
@@ -190,8 +269,54 @@ void mainMenu(void *argument)
     {
       vTaskSuspend(appTaskHandle);
 
-      //menuinit();
+      
+      if(datampu.Ax>0.7)
+      {
+        Pointer->point=PointFront;
+        memcpy(Pointer->block,Pfront,sizeof(Pfront));
+      }
+      else if(datampu.Ax<-0.7)
+      {
+        Pointer->point=PointBack;
+        memcpy(Pointer->block,Pback,sizeof(Pfront));
+      }
+      else if(datampu.Ay>0.7)
+      {
+        Pointer->point=PointLeft;
+        memcpy(Pointer->block,Pleft,sizeof(Pfront));
+      }
+      else if(datampu.Ay<-0.7)
+      {
+        Pointer->point=PointRight;
+        memcpy(Pointer->block,Pright,sizeof(Pfront));
+      }
+      else if(datampu.Az>1.2)
+      {
+        if(Pointer->point==PointFront)
+        {
+          nowMenu=nowMenu->front;
+        }
+        else if(Pointer->point==PointBack)
+        {
+          nowMenu=nowMenu->back;
+        }
+        else if(Pointer->point==PointLeft)
+        {
+          nowMenu=nowMenu->left;
+        }
+        if(Pointer->point==PointRight)
+        {
+          nowMenu=nowMenu->right;
+        }
+      }
 
+      uint8_t leddataTemp[5][8];
+      memcpy(leddataTemp[0],Pointer->block, sizeof(Pointer->block));
+      memcpy(leddataTemp[1],nowMenu->left->block,sizeof(nowMenu->left->block));
+      memcpy(leddataTemp[2],nowMenu->back->block,sizeof(nowMenu->back->block));
+      memcpy(leddataTemp[3],nowMenu->back->block,sizeof(nowMenu->back->block));
+      memcpy(leddataTemp[4],nowMenu->back->block,sizeof(nowMenu->back->block));
+      ledBlock=leddataTemp;
 
     }
 
@@ -213,9 +338,14 @@ void mainMenu(void *argument)
 void refreshLight(void *argument)
 {
   /* USER CODE BEGIN refreshLight */
-  uint8_t IncreaseAndDecrease = 0; //0:+ 1:-
-  uint8_t Intval=0;
   
+
+  for (int i = 0; i < 5; i++) 
+  {
+    memcpy(beginLed[i], fullled, sizeof(fullled));
+  }
+  ledBlock=beginLed;
+
   /* Infinite loop */
   for(;;)
   {
@@ -239,9 +369,8 @@ void refreshLight(void *argument)
       IncreaseAndDecrease=0;
       Intval=0x00;
     }*/
-    LightsendLEDGraphics(led1,led2,led3,led4,led5);
-    
-    vTaskDelay(pdMS_TO_TICKS(50));
+    LightsendLEDGraphics(ledBlock);
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
   /* USER CODE END refreshLight */
 }
@@ -265,25 +394,36 @@ void MPUWatch(void *argument)
 
     vTaskDelay(pdMS_TO_TICKS(5));
 
-    if(datampu.Az>2)  //如果超过加速度阈值就唤醒菜单
+    if(datampu.Az>1)  //如果超过加速度阈值就唤醒菜单
     {  
       LRA_Start();                      //马达起振
-      vTaskDelay(pdMS_TO_TICKS(4));
+      vTaskDelay(pdMS_TO_TICKS(3));
       LRA_Stop();  
 
       menuTimeout=HAL_GetTick();
       vTaskResume(mainMenuTaskHandle);
-
+      vTaskDelay(1000);
 
     }
 
     else if(datampu.Ay>0.7||datampu.Ay<-0.7||datampu.Ax>0.7||datampu.Ax<-0.7)  //如果轴倾斜
     {  
+
+
+      LRA_Start();                      //马达起振
+      vTaskDelay(pdMS_TO_TICKS(3));
+      LRA_Stop();  
+
       menuTimeout=HAL_GetTick();
+      vTaskResume(mainMenuTaskHandle);
+      vTaskDelay(1000);
+
+
+      //menuTimeout=HAL_GetTick();
     }
     
 
-    vTaskDelay(pdMS_TO_TICKS(100));  //采样率
+    vTaskDelay(pdMS_TO_TICKS(10));  //采样率
 
   }
   /* USER CODE END MPUWatch */
@@ -302,7 +442,8 @@ void appRun(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    nowMenu->action();
+    osDelay(10);
   }
   /* USER CODE END appRun */
 }
@@ -311,6 +452,87 @@ void appRun(void *argument)
 /* USER CODE BEGIN Application */
 
 
+void menuInit()
+{
+
+  
+  //init menu val
+  
+  nowMenu=malloc(sizeof(MenuItem));
+  Pointer=malloc(sizeof(pointer));
+  root=malloc(sizeof(MenuItem));
+  setting=malloc(sizeof(MenuItem));
+  display=malloc(sizeof(MenuItem));
+  game=malloc(sizeof(MenuItem));
+  nullMenu=malloc(sizeof(MenuItem));
+  
+
+  //pointer
+  Pointer->point=PointFront;
+  memcpy(Pointer->block,Pfront,sizeof(Pfront));
+
+
+  //nullMenu
+  memcpy(nullMenu->block,fullled,sizeof(fullled));
+  
+  //root
+  root->front=display;
+  root->left=setting;
+  root->right=game;
+  root->back=nullMenu;
+  root->action=rootAction;
+
+  //setting
+  uint8_t settingicon[8] = {
+    0x00, 
+    0x5a, 
+    0x24, 
+    0x5a, 
+    0x5a, 
+    0x24, 
+    0x5a, 
+    0x00
+  };
+  memcpy(setting->block,settingicon,sizeof(settingicon));
+
+
+  
+  nowMenu=root;
+}
+
+
+void rootAction()
+{
+  uint8_t IncreaseAndDecrease = 0; //0:+ 1:-
+  uint8_t Intval=0;
+
+  for(;;)
+  {
+    
+    ledBlock=beginLed;
+    if(IncreaseAndDecrease==0)
+    {
+      Light_Tx(MAX7219_REG_INTENSITY,Intval);
+      Intval++;
+    }
+    if(IncreaseAndDecrease==1)
+    {
+      Light_Tx(MAX7219_REG_INTENSITY,Intval);
+      Intval--;
+    }
+    if(Intval>0x0f) 
+    {
+      IncreaseAndDecrease=1;
+      Intval=0x0f;
+    }
+    if(Intval<0x01) 
+    {
+      IncreaseAndDecrease=0;
+      Intval=0x00;
+    }
+    vTaskDelay(100);
+  }
+}
 
 
 /* USER CODE END Application */

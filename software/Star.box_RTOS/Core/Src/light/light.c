@@ -13,12 +13,12 @@ void Light_WriteBytes(uint8_t* pBuffer,uint16_t byteCount)
     HAL_SPI_Transmit(&hspi1,pBuffer,byteCount,MAX_TIMEOUT);
 }
 
-void LightsendLEDGraphics(uint8_t *led1,uint8_t *led2,uint8_t *led3,uint8_t *led4,uint8_t *led5) 
+void LightsendLEDGraphics(uint8_t (*leddata)[8])
 {
     // 每个 MAX7219 都有8个寄存器需要写入数据
     for (int i = 0; i < 8; i++) 
     {
-        uint8_t data[5] = {led5[i], led4[i], led3[i], led2[i], led1[i]};
+        uint8_t data[5] = {leddata[4][i], leddata[3][i], leddata[1][i], leddata[2][i], leddata[0][i]};
         lightSendToMax7219(i + 1, data, 5);  // MAX7219的地址从0x01到0x08
     }
 }
