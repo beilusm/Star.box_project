@@ -86,24 +86,24 @@ uint8_t Pfront[8] = {
   0x00
 };
 uint8_t Pleft[8] = {
-  0x10,
-  0x30,
-  0x70,
-  0xf0,
-  0xf0,
-  0x70,
-  0x30,
-  0x10
+  0b00000000,
+  0b00001100,
+  0b00011100,
+  0b00111100,
+  0b00111100,
+  0b00011100,
+  0b00001100,
+  0b00000000
 };
 uint8_t Pright[8] = {
-  0x08,
-  0x0c,
-  0x0e,
-  0x0f,
-  0x0f,
-  0x0e,
-  0x0c,
-  0x08
+  0b00000000,
+  0b00110000,
+  0b00111000,
+  0b00111100,
+  0b00111100,
+  0b00111000,
+  0b00110000,
+  0b00000000
 };
 
 
@@ -127,7 +127,7 @@ typedef struct MenuItem {
 typedef struct pointer
 {
   uint8_t block[8];
-  uint8_t point;
+  MenuItem *point;
 }pointer;
 
 
@@ -140,6 +140,7 @@ MenuItem *display;
 MenuItem *game;
 MenuItem *nullMenu;
 
+void (*runAction)(void);
 
 uint32_t menuTimeout;
 
@@ -272,49 +273,43 @@ void mainMenu(void *argument)
       
       if(datampu.Ax>0.7)
       {
-        Pointer->point=PointFront;
+        Pointer->point=nowMenu->front;
         memcpy(Pointer->block,Pfront,sizeof(Pfront));
       }
       else if(datampu.Ax<-0.7)
       {
-        Pointer->point=PointBack;
+        Pointer->point=nowMenu->back;
         memcpy(Pointer->block,Pback,sizeof(Pfront));
       }
       else if(datampu.Ay>0.7)
       {
-        Pointer->point=PointLeft;
+        Pointer->point=nowMenu->left;
         memcpy(Pointer->block,Pleft,sizeof(Pfront));
       }
       else if(datampu.Ay<-0.7)
       {
-        Pointer->point=PointRight;
+        Pointer->point=nowMenu->right;
         memcpy(Pointer->block,Pright,sizeof(Pfront));
       }
-      else if(datampu.Az>1.2)
+      else if(datampu.Az>0.3)
       {
-        if(Pointer->point==PointFront)
+        if(!Pointer->point->action&&Pointer->point->front)
         {
-          nowMenu=nowMenu->front;
+          nowMenu=Pointer->point;
         }
-        else if(Pointer->point==PointBack)
+        else
         {
-          nowMenu=nowMenu->back;
-        }
-        else if(Pointer->point==PointLeft)
-        {
-          nowMenu=nowMenu->left;
-        }
-        if(Pointer->point==PointRight)
-        {
-          nowMenu=nowMenu->right;
+          if(Pointer->point->action)runAction=Pointer->point->action;
+          vTaskResume(appTaskHandle);
+          vTaskSuspend(NULL);
         }
       }
 
       uint8_t leddataTemp[5][8];
       memcpy(leddataTemp[0],Pointer->block, sizeof(Pointer->block));
       memcpy(leddataTemp[1],nowMenu->left->block,sizeof(nowMenu->left->block));
-      memcpy(leddataTemp[2],nowMenu->back->block,sizeof(nowMenu->back->block));
-      memcpy(leddataTemp[3],nowMenu->back->block,sizeof(nowMenu->back->block));
+      memcpy(leddataTemp[2],nowMenu->front->block,sizeof(nowMenu->front->block));
+      memcpy(leddataTemp[3],nowMenu->right->block,sizeof(nowMenu->right->block));
       memcpy(leddataTemp[4],nowMenu->back->block,sizeof(nowMenu->back->block));
       ledBlock=leddataTemp;
 
@@ -349,26 +344,7 @@ void refreshLight(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    /*if(IncreaseAndDecrease==0)
-    {
-      Light_Tx(MAX7219_REG_INTENSITY,Intval);
-      Intval++;
-    }
-    if(IncreaseAndDecrease==1)
-    {
-      Light_Tx(MAX7219_REG_INTENSITY,Intval);
-      Intval--;
-    }
-    if(Intval>0x0f) 
-    {
-      IncreaseAndDecrease=1;
-      Intval=0x0f;
-    }
-    if(Intval<0x01) 
-    {
-      IncreaseAndDecrease=0;
-      Intval=0x00;
-    }*/
+    
     LightsendLEDGraphics(ledBlock);
     vTaskDelay(pdMS_TO_TICKS(100));
   }
@@ -442,7 +418,7 @@ void appRun(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    nowMenu->action();
+    if(runAction)runAction();
     osDelay(10);
   }
   /* USER CODE END appRun */
@@ -467,20 +443,28 @@ void menuInit()
   nullMenu=malloc(sizeof(MenuItem));
   
 
-  //pointer
-  Pointer->point=PointFront;
-  memcpy(Pointer->block,Pfront,sizeof(Pfront));
 
 
   //nullMenu
   memcpy(nullMenu->block,fullled,sizeof(fullled));
+  nullMenu->action=NULL;
+  nullMenu->back=NULL;
+  nullMenu->front=NULL;
+  nullMenu->left=NULL;
+  nullMenu->right=NULL;
   
   //root
   root->front=display;
   root->left=setting;
   root->right=game;
   root->back=nullMenu;
-  root->action=rootAction;
+  root->action=NULL;
+  root->last=root;
+
+  
+  //pointer
+  Pointer->point=display;
+  memcpy(Pointer->block,Pfront,sizeof(Pfront));
 
   //setting
   uint8_t settingicon[8] = {
@@ -494,7 +478,38 @@ void menuInit()
     0x00
   };
   memcpy(setting->block,settingicon,sizeof(settingicon));
+  setting->action=NULL;
+  setting->last=root;
 
+  //display
+  uint8_t displayicon[8]={
+  0b00000000,
+  0b00000000,
+  0b00010000,
+  0b00111000,
+  0b01111100,
+  0b11111110,
+  0b00000000,
+  0b00000000
+  };
+  memcpy(display->block,displayicon,sizeof(displayicon));
+  display->action=rootAction;
+  display->last=NULL;
+
+  //game
+  uint8_t gameicon[8]={
+  0b00000000,
+  0b00011000,
+  0b00111100,
+  0b01111110,
+  0b01100110,
+  0b01100110,
+  0b00000000,
+  0b00000000
+  };
+  memcpy(game->block,gameicon,sizeof(gameicon));
+  game->action=NULL;
+  game->last=root;
 
   
   nowMenu=root;

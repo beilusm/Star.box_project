@@ -18,7 +18,7 @@ void LightsendLEDGraphics(uint8_t (*leddata)[8])
     // 每个 MAX7219 都有8个寄存器需要写入数据
     for (int i = 0; i < 8; i++) 
     {
-        uint8_t data[5] = {leddata[4][i], leddata[3][i], leddata[1][i], leddata[2][i], leddata[0][i]};
+        uint8_t data[5] = {leddata[3][i], leddata[2][i], leddata[1][i], leddata[4][i], leddata[0][i]};
         lightSendToMax7219(i + 1, data, 5);  // MAX7219的地址从0x01到0x08
     }
 }
