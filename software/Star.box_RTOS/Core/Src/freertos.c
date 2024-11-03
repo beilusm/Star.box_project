@@ -136,7 +136,14 @@ MenuItem *nowMenu;
 pointer *Pointer;
 MenuItem *root;
 MenuItem *setting;
+
 MenuItem *display;
+MenuItem *display1;
+MenuItem *display2;
+MenuItem *display3;
+MenuItem *display4;
+
+
 MenuItem *game;
 MenuItem *nullMenu;
 
@@ -185,6 +192,11 @@ const osThreadAttr_t appTask_attributes = {
 void menuInit();
 
 void rootAction();
+void displayAction1();
+void displayAction2();
+void displayAction3();
+void displayAction4();
+
 
 /* USER CODE END FunctionPrototypes */
 
@@ -269,9 +281,29 @@ void mainMenu(void *argument)
     else
     {
       vTaskSuspend(appTaskHandle);
-
       
-      if(datampu.Ax>0.7)
+      if(datampu.Az>0.3)
+      {
+        if(!Pointer->point->action&&Pointer->point->front)
+        {
+          nowMenu=Pointer->point;
+        }
+        else
+        {
+          if(Pointer->point->action)runAction=Pointer->point->action;
+          vTaskResume(appTaskHandle);
+          vTaskSuspend(NULL);
+        }
+      }
+      else if(datampu.Gy<-250)
+      {
+        if(nowMenu->last)
+        {
+          nowMenu=nowMenu->last;
+          runAction=NULL;
+        }
+      }
+      if(datampu.Ax>0.3)
       {
         Pointer->point=nowMenu->front;
         memcpy(Pointer->block,Pfront,sizeof(Pfront));
@@ -290,19 +322,6 @@ void mainMenu(void *argument)
       {
         Pointer->point=nowMenu->right;
         memcpy(Pointer->block,Pright,sizeof(Pfront));
-      }
-      else if(datampu.Az>0.3)
-      {
-        if(!Pointer->point->action&&Pointer->point->front)
-        {
-          nowMenu=Pointer->point;
-        }
-        else
-        {
-          if(Pointer->point->action)runAction=Pointer->point->action;
-          vTaskResume(appTaskHandle);
-          vTaskSuspend(NULL);
-        }
       }
 
       uint8_t leddataTemp[5][8];
@@ -438,7 +457,14 @@ void menuInit()
   Pointer=malloc(sizeof(pointer));
   root=malloc(sizeof(MenuItem));
   setting=malloc(sizeof(MenuItem));
+
   display=malloc(sizeof(MenuItem));
+  display1=malloc(sizeof(MenuItem));
+  display2=malloc(sizeof(MenuItem));
+  display3=malloc(sizeof(MenuItem));
+  display4=malloc(sizeof(MenuItem));
+
+
   game=malloc(sizeof(MenuItem));
   nullMenu=malloc(sizeof(MenuItem));
   
@@ -452,6 +478,7 @@ void menuInit()
   nullMenu->front=NULL;
   nullMenu->left=NULL;
   nullMenu->right=NULL;
+  nullMenu->last=NULL;
   
   //root
   root->front=display;
@@ -493,8 +520,85 @@ void menuInit()
   0b00000000
   };
   memcpy(display->block,displayicon,sizeof(displayicon));
-  display->action=rootAction;
-  display->last=NULL;
+  display->action=NULL;
+  display->last=root;
+  display->front=display1;
+  display->left=display2;
+  display->right=display3;
+  display->back=display4;
+  //1
+  uint8_t display1icon[8]={
+  0b00000000,
+  0b00000110,
+  0b01111110,
+  0b00001110,
+  0b01111110,
+  0b00001110,
+  0b01111110,
+  0b00000110
+  };
+  memcpy(display1->block,display1icon,sizeof(display1icon));
+  display1->action=displayAction1;
+  display1->back=NULL;
+  display1->front=NULL;
+  display1->left=NULL;
+  display1->right=NULL;
+  display1->last=display;
+  //2
+  uint8_t display2icon[8]={
+  0b00000000,
+  0b01111110,
+  0b01111110,
+  0b01111110,
+  0b01111110,
+  0b01111110,
+  0b01111110,
+  0b00000000
+  };
+  memcpy(display2->block,display2icon,sizeof(display2icon));
+  display2->action=displayAction2;
+  display2->back=NULL;
+  display2->front=NULL;
+  display2->left=NULL;
+  display2->right=NULL;
+  display2->last=display;
+  //3
+  uint8_t display3icon[8]={
+  0b11000011,
+  0b10011001,
+  0b00111100,
+  0b01111110,
+  0b01111110,
+  0b00111100,
+  0b10011001,
+  0b11000011
+  };
+  memcpy(display3->block,display3icon,sizeof(display3icon));
+  display3->action=displayAction3;
+  display3->back=NULL;
+  display3->front=NULL;
+  display3->left=NULL;
+  display3->right=NULL;
+  display3->last=display;
+  //4
+  uint8_t display4icon[8]={
+  0b11100111,
+  0b10100101,
+  0b11000011,
+  0b00011000,
+  0b00011000,
+  0b11000011,
+  0b10100101,
+  0b11100111
+  };
+  memcpy(display4->block,display4icon,sizeof(display4icon));
+  display4->action=displayAction4;
+  display4->back=NULL;
+  display4->front=NULL;
+  display4->left=NULL;
+  display4->right=NULL;
+  display4->last=display;
+
 
   //game
   uint8_t gameicon[8]={
@@ -548,6 +652,25 @@ void rootAction()
     vTaskDelay(100);
   }
 }
+
+
+void displayAction1()
+{
+  vTaskDelay(100);
+}
+void displayAction2()
+{
+  vTaskDelay(100);
+}
+void displayAction3()
+{
+  vTaskDelay(100);
+}
+void displayAction4()
+{
+  vTaskDelay(100);
+}
+
 
 
 /* USER CODE END Application */
