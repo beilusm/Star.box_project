@@ -101,6 +101,8 @@ int main(void)
   MX_SPI1_Init();
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
+  HAL_GPIO_WritePin(led_GPIO_Port,led_Pin,GPIO_PIN_SET);
+
   HAL_Delay(1000);
   Light_init();
   DRV2605L_Init();

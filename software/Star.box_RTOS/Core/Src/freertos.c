@@ -36,6 +36,8 @@
 #include <stdbool.h>
 
 
+#include "app/snake.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +53,7 @@
 #define PointRight 2
 #define PointLeft 3
 
+#define MAX32BITS 0xffffffff
 
 /* USER CODE END PD */
 
@@ -62,8 +65,13 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 
+enum mpuStatus
+{
+  AxP,AxN,AyP,AyN,AzP,AzN,GyP,GyN
+};
 
 uint8_t fullled[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+uint8_t shutdown[5][8]={0};
 
 uint8_t Pback[8]={
   0x00,
@@ -136,6 +144,7 @@ MenuItem *nowMenu;
 pointer *Pointer;
 MenuItem *root;
 MenuItem *setting;
+MenuItem *shutdownMode;
 
 MenuItem *display;
 MenuItem *display1;
@@ -145,13 +154,15 @@ MenuItem *display4;
 
 
 MenuItem *game;
+MenuItem *gameSnake;
+
 MenuItem *nullMenu;
 
 void (*runAction)(void);
 
 uint32_t menuTimeout;
 
-
+uint8_t ActionStatus=0;//0停止应用  1允许运行
 
 
 
@@ -196,7 +207,10 @@ void displayAction1();
 void displayAction2();
 void displayAction3();
 void displayAction4();
+void shutdownAction();
 
+
+void gameSnakeAction();
 
 /* USER CODE END FunctionPrototypes */
 
@@ -273,16 +287,19 @@ void mainMenu(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    if(HAL_GetTick()-menuTimeout>8000)
+    vTaskSuspend(appTaskHandle);
+    ActionStatus=0;
+    uint32_t mpuVal;
+    uint8_t leddataTemp[5][8];
+    memcpy(leddataTemp[0],Pointer->block, sizeof(Pointer->block));
+    memcpy(leddataTemp[1],nowMenu->left->block,sizeof(nowMenu->left->block));
+    memcpy(leddataTemp[2],nowMenu->front->block,sizeof(nowMenu->front->block));
+    memcpy(leddataTemp[3],nowMenu->right->block,sizeof(nowMenu->right->block));
+    memcpy(leddataTemp[4],nowMenu->back->block,sizeof(nowMenu->back->block));
+    ledBlock=leddataTemp;
+    if(xTaskNotifyWait(MAX32BITS,MAX32BITS,&mpuVal,pdMS_TO_TICKS(8000))==pdTRUE)
     {
-      vTaskResume(appTaskHandle);
-      vTaskSuspend(NULL);
-    }
-    else
-    {
-      vTaskSuspend(appTaskHandle);
-      
-      if(datampu.Az>0.3)
+      if(mpuVal==AzP)
       {
         if(!Pointer->point->action&&Pointer->point->front)
         {
@@ -295,7 +312,7 @@ void mainMenu(void *argument)
           vTaskSuspend(NULL);
         }
       }
-      else if(datampu.Gy<-250)
+      else if(mpuVal==GyN)
       {
         if(nowMenu->last)
         {
@@ -303,35 +320,31 @@ void mainMenu(void *argument)
           runAction=NULL;
         }
       }
-      if(datampu.Ax>0.3)
+      else if(mpuVal==AxP)
       {
         Pointer->point=nowMenu->front;
         memcpy(Pointer->block,Pfront,sizeof(Pfront));
       }
-      else if(datampu.Ax<-0.7)
+      else if(mpuVal==AxN)
       {
         Pointer->point=nowMenu->back;
         memcpy(Pointer->block,Pback,sizeof(Pfront));
       }
-      else if(datampu.Ay>0.7)
+      else if(mpuVal==AyP)
       {
         Pointer->point=nowMenu->left;
         memcpy(Pointer->block,Pleft,sizeof(Pfront));
       }
-      else if(datampu.Ay<-0.7)
+      else if(mpuVal==AyN)
       {
         Pointer->point=nowMenu->right;
         memcpy(Pointer->block,Pright,sizeof(Pfront));
       }
-
-      uint8_t leddataTemp[5][8];
-      memcpy(leddataTemp[0],Pointer->block, sizeof(Pointer->block));
-      memcpy(leddataTemp[1],nowMenu->left->block,sizeof(nowMenu->left->block));
-      memcpy(leddataTemp[2],nowMenu->front->block,sizeof(nowMenu->front->block));
-      memcpy(leddataTemp[3],nowMenu->right->block,sizeof(nowMenu->right->block));
-      memcpy(leddataTemp[4],nowMenu->back->block,sizeof(nowMenu->back->block));
-      ledBlock=leddataTemp;
-
+    }
+    else 
+    {
+      vTaskResume(appTaskHandle);
+      vTaskSuspend(NULL);
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));  // 每100ms执行一次循环
@@ -353,11 +366,11 @@ void refreshLight(void *argument)
 {
   /* USER CODE BEGIN refreshLight */
   
-
   for (int i = 0; i < 5; i++) 
   {
     memcpy(beginLed[i], fullled, sizeof(fullled));
   }
+
   ledBlock=beginLed;
 
   /* Infinite loop */
@@ -386,35 +399,33 @@ void MPUWatch(void *argument)
   {
     
     MPU6050_StartDMArx();
-
     vTaskDelay(pdMS_TO_TICKS(5));
 
-    if(datampu.Az>1)  //如果超过加速度阈值就唤醒菜单
+    if(datampu.Az>1.2&&eTaskGetState(mainMenuTaskHandle)==eSuspended)  //如果超过加速度阈值就唤醒菜单
     {  
       LRA_Start();                      //马达起振
       vTaskDelay(pdMS_TO_TICKS(3));
       LRA_Stop();  
-
-      menuTimeout=HAL_GetTick();
       vTaskResume(mainMenuTaskHandle);
       vTaskDelay(1000);
-
+      MPU6050_StartDMArx();
+      vTaskDelay(pdMS_TO_TICKS(5));
     }
-
-    else if(datampu.Ay>0.7||datampu.Ay<-0.7||datampu.Ax>0.7||datampu.Ax<-0.7)  //如果轴倾斜
-    {  
-
-
-      LRA_Start();                      //马达起振
-      vTaskDelay(pdMS_TO_TICKS(3));
-      LRA_Stop();  
-
-      menuTimeout=HAL_GetTick();
-      vTaskResume(mainMenuTaskHandle);
-      vTaskDelay(1000);
-
-
-      //menuTimeout=HAL_GetTick();
+    if(eTaskGetState(mainMenuTaskHandle)==eBlocked)
+    {
+      if(datampu.Az>0.3)   
+      {
+        LRA_Start();                      //马达起振
+        vTaskDelay(pdMS_TO_TICKS(3));
+        LRA_Stop();  
+        xTaskNotify(mainMenuTaskHandle,AzP,eSetValueWithOverwrite);
+        vTaskDelay(1000);
+      }
+      else if(datampu.Gy<-250)xTaskNotify(mainMenuTaskHandle,GyN,eSetValueWithOverwrite);
+      else if(datampu.Ax>0.7) xTaskNotify(mainMenuTaskHandle,AxP,eSetValueWithOverwrite);
+      else if(datampu.Ax<-0.7)xTaskNotify(mainMenuTaskHandle,AxN,eSetValueWithOverwrite);
+      else if(datampu.Ay>0.7) xTaskNotify(mainMenuTaskHandle,AyP,eSetValueWithOverwrite);
+      else if(datampu.Ay<-0.7)xTaskNotify(mainMenuTaskHandle,AyN,eSetValueWithOverwrite);
     }
     
 
@@ -457,6 +468,7 @@ void menuInit()
   Pointer=malloc(sizeof(pointer));
   root=malloc(sizeof(MenuItem));
   setting=malloc(sizeof(MenuItem));
+  shutdownMode=malloc(sizeof(MenuItem));
 
   display=malloc(sizeof(MenuItem));
   display1=malloc(sizeof(MenuItem));
@@ -466,6 +478,8 @@ void menuInit()
 
 
   game=malloc(sizeof(MenuItem));
+  gameSnake=malloc(sizeof(MenuItem));
+
   nullMenu=malloc(sizeof(MenuItem));
   
 
@@ -484,7 +498,7 @@ void menuInit()
   root->front=display;
   root->left=setting;
   root->right=game;
-  root->back=nullMenu;
+  root->back=shutdownMode;
   root->action=NULL;
   root->last=root;
 
@@ -614,6 +628,47 @@ void menuInit()
   memcpy(game->block,gameicon,sizeof(gameicon));
   game->action=NULL;
   game->last=root;
+  game->back=nullMenu;
+  game->front=gameSnake;
+  game->left=nullMenu;
+  game->right=nullMenu;
+  //gameSnake
+  uint8_t gameSnakeicon[8]={
+  0b00000000,
+  0b01000000,
+  0b01111100,
+  0b00000100,
+  0b00111100,
+  0b00100000,
+  0b00111110,
+  0b00000000
+  };
+  memcpy(gameSnake->block,gameSnakeicon,sizeof(gameSnakeicon));
+  gameSnake->action=gameSnakeAction;
+  gameSnake->back=NULL;
+  gameSnake->front=NULL;
+  gameSnake->left=NULL;
+  gameSnake->right=NULL;
+  gameSnake->last=game;
+
+  //shutdownMode
+  uint8_t shutdownModeicon[8]={
+  0b00000000,
+  0b00011100,
+  0b00100010,
+  0b11001010,
+  0b11001010,
+  0b00100010,
+  0b00011100,
+  0b00000000
+  };
+  memcpy(shutdownMode->block,shutdownModeicon,sizeof(shutdownModeicon));
+  shutdownMode->action=shutdownAction;
+  shutdownMode->back=NULL;
+  shutdownMode->front=NULL;
+  shutdownMode->left=NULL;
+  shutdownMode->right=NULL;
+  shutdownMode->last=root;
 
   
   nowMenu=root;
@@ -672,6 +727,17 @@ void displayAction4()
 }
 
 
+void shutdownAction()
+{
+  ledBlock=shutdown;
+  vTaskDelay(1000);
+}
+
+void gameSnakeAction()
+{
+  ActionStatus=1;
+  snakeGame(&ledBlock,&ActionStatus);
+}
 
 /* USER CODE END Application */
 
