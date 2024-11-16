@@ -76,8 +76,8 @@ Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM3/port.c \
 Core/Src/sysmem.c \
 Core/Src/syscalls.c \
 Core/Src/dma.c \
-Core/Src/app/snake.c
-
+Core/Src/app/snake.c \
+Core/Src/app/display.c
 
 # ASM sources
 ASM_SOURCES =  \

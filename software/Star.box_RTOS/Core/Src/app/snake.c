@@ -213,13 +213,13 @@ uint8_t snakeGame(uint8_t (**ledBlock)[8],uint8_t *status)
     srand(SysTick->VAL);
     Snake snake;
     init_snake(&snake);
-
+    uint32_t vSnake=rand()%800 + 200;
     while (1) {
         update_direction(&snake); // 更新方向
         if (!update_snake(&snake)||*status==0) break; // 如果游戏结束则退出循环
         print_cube(ledBlock);
         //getchar(); // 暂停，用于查看每次移动
-        vTaskDelay(600);
+        vTaskDelay(vSnake);
     }
 
     return 0;

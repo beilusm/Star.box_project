@@ -37,6 +37,7 @@
 
 
 #include "app/snake.h"
+#include "app/display.h"
 
 /* USER CODE END Includes */
 
@@ -74,43 +75,44 @@ uint8_t fullled[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
 uint8_t shutdown[5][8]={0};
 
 uint8_t Pback[8]={
-  0x00,
-  0x00,
-  0x18,
-  0x3c,
-  0x7e,
-  0x7e,
-  0x00,
-  0x00
+  0b00000000,
+  0b00011000,
+  0b00111100,
+  0b01111110,
+  0b00011000,
+  0b00011000,
+  0b00000000,
+  0b00000000
+
 };
 uint8_t Pfront[8] = {
-  0x00,
-  0x00,
-  0x7e,
-  0x7e,
-  0x3c,
-  0x18,
-  0x00,
-  0x00
+  0b00000000,
+  0b00000000,
+  0b00011000,
+  0b00011000,
+  0b01111110,
+  0b00111100,
+  0b00011000,
+  0b00000000
 };
 uint8_t Pleft[8] = {
   0b00000000,
-  0b00001100,
-  0b00011100,
-  0b00111100,
-  0b00111100,
-  0b00011100,
-  0b00001100,
+  0b00010000,
+  0b00110000,
+  0b01111100,
+  0b01111100,
+  0b00110000,
+  0b00010000,
   0b00000000
 };
 uint8_t Pright[8] = {
   0b00000000,
-  0b00110000,
-  0b00111000,
-  0b00111100,
-  0b00111100,
-  0b00111000,
-  0b00110000,
+  0b00001000,
+  0b00001100,
+  0b00111110,
+  0b00111110,
+  0b00001100,
+  0b00001000,
   0b00000000
 };
 
@@ -136,6 +138,7 @@ typedef struct pointer
 {
   uint8_t block[8];
   MenuItem *point;
+  uint8_t status; //1左 2前 3右 4后
 }pointer;
 
 
@@ -297,13 +300,28 @@ void mainMenu(void *argument)
     memcpy(leddataTemp[3],nowMenu->right->block,sizeof(nowMenu->right->block));
     memcpy(leddataTemp[4],nowMenu->back->block,sizeof(nowMenu->back->block));
     ledBlock=leddataTemp;
-    if(xTaskNotifyWait(MAX32BITS,MAX32BITS,&mpuVal,pdMS_TO_TICKS(8000))==pdTRUE)
+    if(xTaskNotifyWait(MAX32BITS,MAX32BITS,&mpuVal,pdMS_TO_TICKS(12000))==pdTRUE)
     {
       if(mpuVal==AzP)
       {
         if(!Pointer->point->action&&Pointer->point->front)
         {
           nowMenu=Pointer->point;
+          switch (Pointer->status)
+          {
+          case 1:
+            Pointer->point=Pointer->point->left;
+            break;
+          case 2:
+            Pointer->point=Pointer->point->front;
+            break;
+          case 3:
+            Pointer->point=Pointer->point->right;
+            break;
+          case 4:
+            Pointer->point=Pointer->point->back;
+            break;
+          }
         }
         else
         {
@@ -317,32 +335,37 @@ void mainMenu(void *argument)
         if(nowMenu->last)
         {
           nowMenu=nowMenu->last;
-          runAction=NULL;
+          runAction=shutdownAction;
         }
       }
       else if(mpuVal==AxP)
       {
         Pointer->point=nowMenu->front;
+        Pointer->status=2;
         memcpy(Pointer->block,Pfront,sizeof(Pfront));
       }
       else if(mpuVal==AxN)
       {
         Pointer->point=nowMenu->back;
+        Pointer->status=4;
         memcpy(Pointer->block,Pback,sizeof(Pfront));
       }
       else if(mpuVal==AyP)
       {
         Pointer->point=nowMenu->left;
+        Pointer->status=1;
         memcpy(Pointer->block,Pleft,sizeof(Pfront));
       }
       else if(mpuVal==AyN)
       {
         Pointer->point=nowMenu->right;
+        Pointer->status=3;
         memcpy(Pointer->block,Pright,sizeof(Pfront));
       }
     }
     else 
     {
+      runAction=shutdownAction;
       vTaskResume(appTaskHandle);
       vTaskSuspend(NULL);
     }
@@ -421,7 +444,7 @@ void MPUWatch(void *argument)
         xTaskNotify(mainMenuTaskHandle,AzP,eSetValueWithOverwrite);
         vTaskDelay(1000);
       }
-      else if(datampu.Gy<-250)xTaskNotify(mainMenuTaskHandle,GyN,eSetValueWithOverwrite);
+      else if(datampu.Gy<-150)xTaskNotify(mainMenuTaskHandle,GyN,eSetValueWithOverwrite);
       else if(datampu.Ax>0.7) xTaskNotify(mainMenuTaskHandle,AxP,eSetValueWithOverwrite);
       else if(datampu.Ax<-0.7)xTaskNotify(mainMenuTaskHandle,AxN,eSetValueWithOverwrite);
       else if(datampu.Ay>0.7) xTaskNotify(mainMenuTaskHandle,AyP,eSetValueWithOverwrite);
@@ -504,6 +527,7 @@ void menuInit()
 
   
   //pointer
+  Pointer->status=2;
   Pointer->point=display;
   memcpy(Pointer->block,Pfront,sizeof(Pfront));
 
@@ -526,10 +550,10 @@ void menuInit()
   uint8_t displayicon[8]={
   0b00000000,
   0b00000000,
-  0b00010000,
-  0b00111000,
-  0b01111100,
-  0b11111110,
+  0b00011000,
+  0b00100100,
+  0b01000010,
+  0b01111110,
   0b00000000,
   0b00000000
   };
@@ -542,14 +566,14 @@ void menuInit()
   display->back=display4;
   //1
   uint8_t display1icon[8]={
-  0b00000000,
-  0b00000110,
+  0b10000001,
   0b01111110,
-  0b00001110,
+  0b01011010,
   0b01111110,
-  0b00001110,
   0b01111110,
-  0b00000110
+  0b01011010,
+  0b01111110,
+  0b10000001
   };
   memcpy(display1->block,display1icon,sizeof(display1icon));
   display1->action=displayAction1;
@@ -560,14 +584,14 @@ void menuInit()
   display1->last=display;
   //2
   uint8_t display2icon[8]={
-  0b00000000,
   0b01111110,
-  0b01111110,
-  0b01111110,
-  0b01111110,
-  0b01111110,
-  0b01111110,
-  0b00000000
+  0b10100101,
+  0b11011011,
+  0b01100110,
+  0b01100110,
+  0b11011011,
+  0b10100101,
+  0b01111110
   };
   memcpy(display2->block,display2icon,sizeof(display2icon));
   display2->action=displayAction2;
@@ -617,49 +641,31 @@ void menuInit()
   //game
   uint8_t gameicon[8]={
   0b00000000,
-  0b00011000,
-  0b00111100,
-  0b01111110,
-  0b01100110,
-  0b01100110,
-  0b00000000,
+  0b00000110,
+  0b01110100,
+  0b01010100,
+  0b01010100,
+  0b01011100,
+  0b01000000,
   0b00000000
   };
   memcpy(game->block,gameicon,sizeof(gameicon));
-  game->action=NULL;
+  game->action=gameSnakeAction;
   game->last=root;
-  game->back=nullMenu;
-  game->front=gameSnake;
-  game->left=nullMenu;
-  game->right=nullMenu;
-  //gameSnake
-  uint8_t gameSnakeicon[8]={
-  0b00000000,
-  0b01000000,
-  0b01111100,
-  0b00000100,
-  0b00111100,
-  0b00100000,
-  0b00111110,
-  0b00000000
-  };
-  memcpy(gameSnake->block,gameSnakeicon,sizeof(gameSnakeicon));
-  gameSnake->action=gameSnakeAction;
-  gameSnake->back=NULL;
-  gameSnake->front=NULL;
-  gameSnake->left=NULL;
-  gameSnake->right=NULL;
-  gameSnake->last=game;
+  game->back=NULL;
+  game->front=NULL;
+  game->left=NULL;
+  game->right=NULL;
 
   //shutdownMode
   uint8_t shutdownModeicon[8]={
   0b00000000,
-  0b00011100,
-  0b00100010,
-  0b11001010,
-  0b11001010,
-  0b00100010,
-  0b00011100,
+  0b00111100,
+  0b00000010,
+  0b01111010,
+  0b01111010,
+  0b00000010,
+  0b00111100,
   0b00000000
   };
   memcpy(shutdownMode->block,shutdownModeicon,sizeof(shutdownModeicon));
@@ -711,15 +717,18 @@ void rootAction()
 
 void displayAction1()
 {
+  ledBlock=beginLed;
   vTaskDelay(100);
 }
 void displayAction2()
 {
-  vTaskDelay(100);
+  ActionStatus=1;
+  display1Main(&ledBlock,&ActionStatus);
 }
 void displayAction3()
 {
-  vTaskDelay(100);
+  ActionStatus=1;
+  display2Main(&ledBlock,&ActionStatus);
 }
 void displayAction4()
 {

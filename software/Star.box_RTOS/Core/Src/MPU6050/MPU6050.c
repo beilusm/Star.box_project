@@ -68,7 +68,7 @@ void MPU6050_setLPF(uint8_t lpf)
 
 void MPU6050_initialize(void) {
     MPU6050_setClockSource(MPU6050_CLOCK_PLL_XGYRO); //设置时钟
-    MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_250); //陀螺仪最大量程 +-250度每秒
+    MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_1000); //陀螺仪最大量程 +-1000度每秒
     MPU6050_setFullScaleAccelRange(MPU6050_ACCEL_FS_2);	//加速度度最大量程 +-2G
     MPU6050_setRate(500);						//设置采样率500Hz
     MPU6050_setLPF(1);                          //设置低通滤波
@@ -138,9 +138,9 @@ void MPU6050_Read_Gyro(MPU6050_t *DataStruct)
     DataStruct->Gyro_X_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data[1]);
     DataStruct->Gyro_Y_RAW = (int16_t)(Rec_Data[2] << 8 | Rec_Data[3]);
     DataStruct->Gyro_Z_RAW = (int16_t)(Rec_Data[4] << 8 | Rec_Data[5]);
-    DataStruct->Gx = DataStruct->Gyro_X_RAW / 131.0;
-    DataStruct->Gy = DataStruct->Gyro_Y_RAW / 131.0;
-    DataStruct->Gz = DataStruct->Gyro_Z_RAW / 131.0;
+    DataStruct->Gx = DataStruct->Gyro_X_RAW / 32.8;
+    DataStruct->Gy = DataStruct->Gyro_Y_RAW / 32.8;
+    DataStruct->Gz = DataStruct->Gyro_Z_RAW / 32.8;
 }
 
 void MPU6050_Read_G_A(MPU6050_t *DataStruct)
