@@ -15,6 +15,7 @@
 
 
 
+#define MATRIX_COUNT 5 // 矩阵数量
 
 
 
@@ -170,6 +171,55 @@ void flowDown(uint8_t (**led)[8],FlowPoint *point) {
 }
 
 
+// 点亮或熄灭指定矩阵的正方形区域
+void drawSquare(uint8_t matrix, uint8_t size, uint8_t state,uint8_t (**led)[8]) {
+    if (size > 8) size = 8; // 限制最大范围
+    uint8_t start = (8 - size) / 2; // 计算正方形起点
+    uint8_t end = start + size;    // 计算正方形终点
+
+    for (uint8_t y = start; y < end; y++) {
+        for (uint8_t x = start; x < end; x++) {
+            if (state) {
+                (*led)[matrix][y] |= (1 << x); // 点亮像素
+            } else {
+                (*led)[matrix][y] &= ~(1 << x); // 熄灭像素
+            }
+        }
+    }
+}
+
+// 点亮和熄灭效果
+void lightEffect(uint8_t (**led)[8],uint8_t *status) {
+    uint8_t size = 2;       // 起始正方形大小
+    uint8_t increasing = 1; // 1表示扩大正方形，0表示缩小正方形
+
+    while (1) {
+        if (*status==0) break; 
+        // 更新每个矩阵
+        for (uint8_t matrix = 0; matrix < MATRIX_COUNT; matrix++) {
+            drawSquare(matrix, size, increasing,led); // 绘制正方形
+        }
+
+        vTaskDelay(150);   // 控制动画速度
+
+        // 调整正方形大小
+        if (increasing) {
+            size += 2; // 扩大正方形
+            if (size > 8) {
+                size = 2;
+                increasing = 0; // 切换为缩小
+            }
+        } else {
+            size += 2; // 缩小正方形
+            if (size >8 ) {
+                size = 0;
+                //clearAllMatrices(led); // 整个面清空
+                increasing = 1; // 切换为扩大
+            }
+        }
+    }
+}
+
 void display1Main(uint8_t (**led)[8],uint8_t *status)
 {
     clearAllMatrices(led);
@@ -183,6 +233,7 @@ void display1Main(uint8_t (**led)[8],uint8_t *status)
         vTaskDelay(50);        // 控制速度
     }
 }
+
 
 
 void display2Main(uint8_t (**led)[8],uint8_t *status)
@@ -212,5 +263,15 @@ void display2Main(uint8_t (**led)[8],uint8_t *status)
 
         vTaskDelay(230);        // 控制速度
     }
+}
+
+void display3Main(uint8_t (**led)[8],uint8_t *status)
+{
+    clearAllMatrices(led);
+
+    // 执行动画效果
+    lightEffect(led,status);
+
+
 }
 

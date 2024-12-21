@@ -38,6 +38,7 @@
 
 #include "app/snake.h"
 #include "app/display.h"
+#include "app/setting.h"
 
 /* USER CODE END Includes */
 
@@ -118,19 +119,17 @@ uint8_t Pright[8] = {
 
 
 
+uint8_t settingLed[5][8]={0};
 uint8_t beginLed[5][8];
 uint8_t (*ledBlock)[8];
 
 typedef struct MenuItem {
   uint8_t block[8];
-
   struct MenuItem *front;
   struct MenuItem *back;
   struct MenuItem *left;
   struct MenuItem *right;
-
   struct MenuItem *last;
-
   void (*action)(void);
 }MenuItem;
 
@@ -157,7 +156,6 @@ MenuItem *display4;
 
 
 MenuItem *game;
-MenuItem *gameSnake;
 
 MenuItem *nullMenu;
 
@@ -167,6 +165,9 @@ uint32_t menuTimeout;
 
 uint8_t ActionStatus=0;//0停止应用  1允许运行
 
+
+int8_t lightInten=0;
+uint8_t lightMode=0; //0普通模式 1呼吸模式
 
 
 /* USER CODE END Variables */
@@ -211,6 +212,8 @@ void displayAction2();
 void displayAction3();
 void displayAction4();
 void shutdownAction();
+
+void settingAction();
 
 
 void gameSnakeAction();
@@ -396,10 +399,34 @@ void refreshLight(void *argument)
 
   ledBlock=beginLed;
 
+  memcpy(settingLed[0],tipMid,sizeof(tipMid));
+  
+  memcpy(settingLed[1],tipLemind,sizeof(tipLemind));
+  memcpy(settingLed[3],tipRiNomind,sizeof(tipRiNomind));
+
+  uint8_t IncreaseAndDecrease = 0; //0:+ 1:-
   /* Infinite loop */
   for(;;)
   {
-    
+    if(lightMode==1){
+      if(IncreaseAndDecrease==1){
+        lightInten--;
+      }else if(IncreaseAndDecrease==0){
+        lightInten++;
+      }
+
+      if(lightInten>0x0f) 
+      {
+        IncreaseAndDecrease=1;
+        lightInten=0x0f;
+      }
+      if(lightInten<0x00) 
+      {
+        IncreaseAndDecrease=0;
+        lightInten=0x00;
+      }
+    }
+    Light_Tx(MAX7219_REG_INTENSITY,lightInten);
     LightsendLEDGraphics(ledBlock);
     vTaskDelay(pdMS_TO_TICKS(100));
   }
@@ -444,12 +471,16 @@ void MPUWatch(void *argument)
         xTaskNotify(mainMenuTaskHandle,AzP,eSetValueWithOverwrite);
         vTaskDelay(1000);
       }
-      else if(datampu.Gy<-150)xTaskNotify(mainMenuTaskHandle,GyN,eSetValueWithOverwrite);
-      else if(datampu.Ax>0.7) xTaskNotify(mainMenuTaskHandle,AxP,eSetValueWithOverwrite);
-      else if(datampu.Ax<-0.7)xTaskNotify(mainMenuTaskHandle,AxN,eSetValueWithOverwrite);
-      else if(datampu.Ay>0.7) xTaskNotify(mainMenuTaskHandle,AyP,eSetValueWithOverwrite);
-      else if(datampu.Ay<-0.7)xTaskNotify(mainMenuTaskHandle,AyN,eSetValueWithOverwrite);
+      else if(datampu.Gy<-150){xTaskNotify(mainMenuTaskHandle,GyN,eSetValueWithOverwrite);}
+      else if(datampu.Ax>0.7) {xTaskNotify(mainMenuTaskHandle,AxP,eSetValueWithOverwrite);xTaskNotify(appTaskHandle,AxP,eSetValueWithOverwrite);}
+      else if(datampu.Ax<-0.7){xTaskNotify(mainMenuTaskHandle,AxN,eSetValueWithOverwrite);xTaskNotify(appTaskHandle,AxN,eSetValueWithOverwrite);}
+      else if(datampu.Ay>0.7) {xTaskNotify(mainMenuTaskHandle,AyP,eSetValueWithOverwrite);xTaskNotify(appTaskHandle,AyP,eSetValueWithOverwrite);}
+      else if(datampu.Ay<-0.7){xTaskNotify(mainMenuTaskHandle,AyN,eSetValueWithOverwrite);xTaskNotify(appTaskHandle,AyN,eSetValueWithOverwrite);}
     }
+    if(datampu.Ax>0.7)      {xTaskNotify(appTaskHandle,AxP,eSetValueWithOverwrite);}
+    else if(datampu.Ax<-0.7){xTaskNotify(appTaskHandle,AxN,eSetValueWithOverwrite);}
+    else if(datampu.Ay>0.7) {xTaskNotify(appTaskHandle,AyP,eSetValueWithOverwrite);}
+    else if(datampu.Ay<-0.7){xTaskNotify(appTaskHandle,AyN,eSetValueWithOverwrite);}
     
 
     vTaskDelay(pdMS_TO_TICKS(10));  //采样率
@@ -501,7 +532,6 @@ void menuInit()
 
 
   game=malloc(sizeof(MenuItem));
-  gameSnake=malloc(sizeof(MenuItem));
 
   nullMenu=malloc(sizeof(MenuItem));
   
@@ -543,7 +573,7 @@ void menuInit()
     0x00
   };
   memcpy(setting->block,settingicon,sizeof(settingicon));
-  setting->action=NULL;
+  setting->action=settingAction;
   setting->last=root;
 
   //display
@@ -732,7 +762,8 @@ void displayAction3()
 }
 void displayAction4()
 {
-  vTaskDelay(100);
+  ActionStatus=1;
+  display3Main(&ledBlock,&ActionStatus);
 }
 
 
@@ -747,6 +778,52 @@ void gameSnakeAction()
   ActionStatus=1;
   snakeGame(&ledBlock,&ActionStatus);
 }
+
+void settingAction()
+{
+  ledBlock=settingLed;
+  ActionStatus=1;
+  while (1){
+    if(ActionStatus==0)break;
+    uint32_t mpuVal;
+    if(xTaskNotifyWait(MAX32BITS,MAX32BITS,&mpuVal,pdMS_TO_TICKS(100))==pdTRUE){
+      if(mpuVal==AxP){  //前倾斜
+        if(lightInten<15)lightInten++;
+        memcpy(settingLed[0],tipFront,sizeof(tipFront));
+      }else if(mpuVal==AxN){
+        if(lightInten>0)lightInten--;
+        memcpy(settingLed[0],tipBack,sizeof(tipBack));
+      }else if(mpuVal==AyP){
+        if(ActionStatus==0)break;
+        lightMode=0;
+        memcpy(settingLed[1],tipLemind,sizeof(tipLemind));
+        memcpy(settingLed[3],tipRiNomind,sizeof(tipRiNomind));
+        mpuVal=-1;
+        memcpy(settingLed[0],tipLeft,sizeof(tipLeft));
+      }else if(mpuVal==AyN){
+        if(ActionStatus==0)break;
+        lightMode=1;
+        memcpy(settingLed[1],tipLeNomind,sizeof(tipLeNomind));
+        memcpy(settingLed[3],tipRimind,sizeof(tipRimind));
+        mpuVal=-1;
+        memcpy(settingLed[0],tipRight,sizeof(tipRight));
+      } 
+      uint8_t cho=(lightInten+1)/2;
+      memcpy(settingLed[2],tipInten[cho],sizeof(tipInten[cho]));
+      memcpy(settingLed[4],tipInten[cho],sizeof(tipInten[cho]));
+
+
+      vTaskDelay(500);
+    }else {
+      memcpy(settingLed[0],tipMid,sizeof(tipMid));
+    }
+
+
+
+  }
+
+}
+
 
 /* USER CODE END Application */
 

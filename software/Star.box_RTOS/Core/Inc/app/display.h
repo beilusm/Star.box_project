@@ -20,5 +20,6 @@
 
 void display1Main(uint8_t (**led)[8],uint8_t *status);
 void display2Main(uint8_t (**led)[8],uint8_t *status);
+void display3Main(uint8_t (**led)[8],uint8_t *status);
 
 #endif
